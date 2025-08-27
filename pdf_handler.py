@@ -10,6 +10,35 @@ from sklearn.cluster import KMeans
 import config
 
 
+def count_regions_below_threshold(region_size, thre_size):
+    """
+    统计region_size中小于thre_size中每个阈值的区域个数
+
+    参数:
+    region_size: 区域面积数组
+    thre_size: 阈值数组
+
+    返回:
+    results: 包含统计结果的字典
+    """
+    # 确保输入是numpy数组以便于计算
+    region_arr = np.array(region_size)
+    thre_arr = np.array(thre_size)
+
+    results = {}
+
+    # 对每个阈值进行统计
+    for i, threshold in enumerate(thre_arr):
+        # 计算大于当前阈值的区域数量
+        count = np.sum(region_arr > threshold)
+        results[threshold] = count
+
+        # 打印结果
+        print(f"阈值 {threshold}: 有 {count} 个区域的面积大于此值")
+
+    return results
+
+
 def pdf_to_image(pdf_path, image_size=2048, page_num=0):
     """
     将PDF文件的指定页面转换为图像，并缩放到最长边为2048像素
@@ -168,6 +197,9 @@ def cluster_colors(image1k, image2k_hsv, image2k_non_border_mask):
     start_time = time.time()
 
     borders, non_border_mask = extract_black_borders(image1k)
+    # 减少区域, 防止边界可能得噪音
+    kernel = np.ones((3, 3), np.uint8)
+    non_border_mask = cv2.morphologyEx(non_border_mask, cv2.MORPH_ERODE, kernel)
 
     # 转换图像为HSV颜色空间，便于颜色分割
     hsv_img = cv2.cvtColor(image1k, cv2.COLOR_BGR2HSV)
@@ -274,6 +306,9 @@ def find_regions(image_2k, image_1k):
         for cluster_idx in range(n_colors):
             # 创建当前颜色聚类的掩码
             color_mask = (temp_labels == (cluster_idx + 1)).astype(np.uint8) * 255
+            # # 去掉一些非常细的边界
+            # kernel = np.ones((3, 3), np.uint8)
+            # color_mask = cv2.morphologyEx(color_mask, cv2.MORPH_OPEN, kernel)
             
             # 获取当前聚类的BGR颜色
             cluster_hsv = centers[cluster_idx]
@@ -312,9 +347,9 @@ def find_regions(image_2k, image_1k):
     return final_labels, stats_array, centroids_array, num_regions, is_black_list
 
 
-def get_region_colors(image, labels, num_regions):
+def get_region_info(image, labels, num_regions):
     """
-    获取每个区域的主要颜色
+    获取每个区域的主要颜色和数量
     
     Args:
         image: 原始图像
@@ -325,6 +360,7 @@ def get_region_colors(image, labels, num_regions):
         region_colors: 每个区域的主要颜色
     """
     region_colors = {}
+    region_size = []
     
     for i in range(1, num_regions + 1):  # 跳过背景（标签0）
         # 创建当前区域的掩码
@@ -342,8 +378,9 @@ def get_region_colors(image, labels, num_regions):
             # 将颜色转换为元组以便作为字典键
             color_tuple = tuple(avg_color)
             region_colors[i] = color_tuple
+            region_size.append(len(non_zero_pixels))
     
-    return region_colors
+    return region_colors, region_size
 
 
 def analyze_pdf(pdf_path):
@@ -364,8 +401,8 @@ def analyze_pdf(pdf_path):
     # 查找区域（先识别黑色边界，然后在非边界区域进行处理）
     labels, stats, centroids, num_regions, is_black_list = find_regions(image, image_1k)
     
-    # 获取每个区域的颜色
-    region_colors = get_region_colors(image, labels, num_regions)
+    # 获取每个区域的颜色和数量
+    region_colors, regions_size = get_region_info(image, labels, num_regions)
     
     # 计算每个区域的像素数量（面积）并排除黑色区域
     region_areas = {}

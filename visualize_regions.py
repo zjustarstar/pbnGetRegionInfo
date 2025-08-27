@@ -3,7 +3,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
-from pdf_handler import pdf_to_image, find_regions, get_region_colors
+from pdf_handler import pdf_to_image, find_regions, get_region_info, count_regions_below_threshold
 
 
 def create_colored_regions_image(image, labels, num_regions, is_black_list=None):
@@ -89,7 +89,8 @@ def visualize_regions(pdf_path, output_dir):
     labels, stats, centroids, num_regions, is_black_list = find_regions(image, image_1k)
     
     # 获取每个区域的颜色
-    region_colors = get_region_colors(image, labels, num_regions)
+    region_colors, region_size = get_region_info(image, labels, num_regions)
+    count_regions_below_threshold(region_size, [20, 30, 50])
     
     # 统计非黑色区域的数量
     non_black_regions = sum(1 for i in range(1, num_regions + 1) if not is_black_list[i])
@@ -172,7 +173,7 @@ def visualize_regions(pdf_path, output_dir):
 
 def visualize_color_distribution(region_colors, output_dir, pdf_name, is_black_list=None):
     """
-    可视化颜色分布
+    可视化颜色分布，只显示区域数量最多的10个和最少的10个颜色
     
     Args:
         region_colors: 每个区域的颜色
@@ -196,12 +197,23 @@ def visualize_color_distribution(region_colors, output_dir, pdf_name, is_black_l
         else:
             color_counts[color] = 1
     
+    # 按区域数量排序
+    sorted_colors = sorted(color_counts.items(), key=lambda x: x[1])
+    
+    # 获取区域数量最少的10个和最多的10个颜色
+    min_colors = sorted_colors[:min(10, len(sorted_colors)//2)]
+    max_colors = sorted_colors[-min(10, len(sorted_colors)//2):]
+    
+    # 合并最少和最多的颜色
+    selected_colors = min_colors + max_colors
+    
     # 创建颜色分布图
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(12, 6))
     
     # 准备数据
-    colors = list(color_counts.keys())
-    counts = list(color_counts.values())
+    colors = [item[0] for item in selected_colors]
+    counts = [item[1] for item in selected_colors]
+    labels = [f"最少{i+1}" for i in range(len(min_colors))] + [f"最多{i+1}" for i in range(len(max_colors))]
     
     # 将BGR颜色转换为RGB用于显示
     rgb_colors = [(c[2]/255, c[1]/255, c[0]/255) for c in colors]
@@ -216,11 +228,11 @@ def visualize_color_distribution(region_colors, output_dir, pdf_name, is_black_l
                 str(count), ha='center', va='bottom')
     
     # 设置标题和标签
-    ax.set_title(f'颜色分布 (共 {len(colors)} 种非黑色颜色)')
+    ax.set_title(f'颜色分布 (显示区域数量最多和最少的各10个颜色，共 {len(color_counts)} 种非黑色颜色)')
     ax.set_xlabel('颜色')
     ax.set_ylabel('区域数量')
     ax.set_xticks(range(len(colors)))
-    ax.set_xticklabels([f"颜色 {i+1}" for i in range(len(colors))])
+    ax.set_xticklabels(labels)
     
     # 调整布局
     plt.tight_layout()
@@ -230,13 +242,23 @@ def visualize_color_distribution(region_colors, output_dir, pdf_name, is_black_l
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     
+    # 打印区域数量最多和最少的10个颜色
+    print(f"颜色分布 (共 {len(color_counts)} 种非黑色颜色)")
+    print("区域数量最少的10个颜色:")
+    for i, (color, count) in enumerate(min_colors):
+        print(f"  颜色 {i+1}: BGR={color}, 区域数量={count}")
+    
+    print("区域数量最多的10个颜色:")
+    for i, (color, count) in enumerate(max_colors):
+        print(f"  颜色 {i+1}: BGR={color}, 区域数量={count}")
+    
     print(f"颜色分布图已保存到: {output_path}")
 
 def main():
     # 处理data目录中的所有PDF文件
     data_dir = "data\\pdf"
     files = [f for f in os.listdir(data_dir) if f.endswith(".pdf")]
-    files = ["472.pdf"]
+    # files = ["1313.pdf"]
     
     # 创建输出目录
     output_dir = "output"
@@ -254,7 +276,7 @@ def main():
             vis_results = visualize_regions(file_path, output_dir)
             
             # 可视化颜色分布
-            # visualize_color_distribution(vis_results["region_colors"], output_dir, file_name, vis_results["is_black_list"])
+            visualize_color_distribution(vis_results["region_colors"], output_dir, file_name, vis_results["is_black_list"])
             
         except Exception as e:
             print(f"处理文件 {f} 时出错: {str(e)}")
