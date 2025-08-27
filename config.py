@@ -5,5 +5,6 @@ MinAreaOfRegion = 20      # 最小区域大小
 ColorNumForCluster = 100   # 聚类时的颜色数量。一般50-200种颜色;
 
 # debug parameter
-SaveBorderImage = False
-# 显示最多和最少多少个颜色的区域数量
+SaveBorderImage = False    #保存黑色边界图;仅保存最新的一张;
+SaveVisualResult = True    #保存可视化结果
+

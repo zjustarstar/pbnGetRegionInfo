@@ -387,7 +387,7 @@ def find_regions(image_2k, image_1k):
 #     return region_colors, region_size
 
 
-def analyze_pdf(pdf_path):
+def analyze_pdf(image, pdf_path):
     """
     分析PDF文件中的区域和颜色
     首先提取黑色边界，然后只在非边界区域进行颜色聚类和区域识别
@@ -398,66 +398,19 @@ def analyze_pdf(pdf_path):
     Returns:
         分析结果的字典
     """
-    # 从PDF读取图像, 默认生成的事2k的图
-    image, (_,_, imgw, imgh) = pdf_to_image(pdf_path)
-    image_1k, (_, _, imgw, imgh) = pdf_to_image(pdf_path, image_size=config.ImgSizeForCluster)
+    # 从PDF读取图像, 默认生成的事2k的图, 这里生成一个1k的用于聚类
+    image_1k, _ = pdf_to_image(pdf_path, image_size=config.ImgSizeForCluster)
     
     # 查找区域（先识别黑色边界，然后在非边界区域进行处理）
-    labels, stats, centroids, num_regions, is_black_list = find_regions(image, image_1k)
+    labels, region_colors, region_size, num_regions, is_black_list = find_regions(image, image_1k)
     
-    # 获取每个区域的颜色和数量
-    region_colors, regions_size = get_region_info(image, labels, num_regions)
-    
-    # 计算每个区域的像素数量（面积）并排除黑色区域
-    region_areas = {}
-    non_black_regions = []
-    black_regions = []
-    
-    for i in range(1, num_regions + 1):  # 跳过背景（标签0）
-        if is_black_list[i]:  # 黑色区域
-            black_regions.append(i)
-        else:  # 非黑色区域
-            region_areas[i] = stats[i, cv2.CC_STAT_AREA]
-            non_black_regions.append(i)
-    
-    # 统计非黑色区域的数量
-    non_black_count = len(non_black_regions)
-    black_count = len(black_regions)
-    
-    print(f"识别到 {black_count} 个黑色边界区域，{non_black_count} 个非黑色区域")
-    
-    # 找出最大和最小区域（只考虑非黑色区域）
-    max_region = max(region_areas.items(), key=lambda x: x[1]) if region_areas else (0, 0)
-    min_region = min(region_areas.items(), key=lambda x: x[1]) if region_areas else (0, 0)
-    
-    # 统计每种颜色对应的区域数量（只考虑非黑色区域）
-    color_regions = defaultdict(list)
-    for region_id in non_black_regions:
-        if region_id in region_colors:
-            color = region_colors[region_id]
-            color_regions[color].append(region_id)
-    
-    # 计算每种颜色的区域数量
-    color_region_counts = {color: len(regions) for color, regions in color_regions.items()}
-    
-    # 找出包含同一种颜色的最多和最少区域数量
-    max_color_regions = max(color_region_counts.items(), key=lambda x: x[1]) if color_region_counts else ((0, 0, 0), 0)
-    min_color_regions = min(color_region_counts.items(), key=lambda x: x[1]) if color_region_counts else ((0, 0, 0), 0)
-    
-    # 返回分析结果
-    return {
-        "num_regions": non_black_count,  # 只计算非黑色区域
-        "num_colors": len(color_regions),
-        "max_region_area": max_region[1],
-        "min_region_area": min_region[1],
-        "max_color_regions": max_color_regions[1],
-        "min_color_regions": min_color_regions[1],
-        "color_counts": dict(color_region_counts),
-        "labels": labels,  # 添加标签信息供可视化使用
-        "is_black_list": is_black_list,  # 添加黑色区域标记供可视化使用
-        "black_regions": black_regions,  # 添加黑色区域列表
-        "non_black_regions": non_black_regions  # 添加非黑色区域列表
-    }
+    #统计不同阈值下的色块数量
+    count_results = count_regions_below_threshold(region_size, [20, 30, 50])
+
+    # # 统计非黑色区域的数量
+    # non_black_regions = sum(1 for i in range(1, num_regions + 1) if not is_black_list[i])
+
+    return labels, num_regions, region_colors, is_black_list
 
 
 def extract_black_borders(image, threshold=config.BinaryThreshold):
@@ -487,32 +440,3 @@ def extract_black_borders(image, threshold=config.BinaryThreshold):
     print(f"黑色边界提取完成")
     
     return borders, non_border_mask
-
-
-if __name__ == "__main__":
-    # 创建输出目录
-    output_dir = "output"
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    
-    # 处理data目录中的所有PDF文件
-    data_dir = "data"
-    pdf_files = [f for f in os.listdir(data_dir) if f.endswith(".pdf")]
-    
-    for pdf_file in pdf_files:
-        pdf_path = os.path.join(data_dir, pdf_file)
-        print(f"\n分析文件: {pdf_file}")
-        
-        try:
-            results = analyze_pdf(pdf_path)
-            
-            # 输出分析结果
-            print(f"闭合连通区域数量（不含黑色区域）: {results['num_regions']}")
-            print(f"不同颜色数量: {results['num_colors']}")
-            print(f"最大区域像素数: {results['max_region_area']}")
-            print(f"最小区域像素数: {results['min_region_area']}")
-            print(f"包含同一种颜色的最多区域数量: {results['max_color_regions']}")
-            print(f"包含同一种颜色的最少区域数量: {results['min_color_regions']}")
-            
-        except Exception as e:
-            print(f"处理文件 {pdf_file} 时出错: {str(e)}")

@@ -71,28 +71,22 @@ def create_original_color_regions(image, labels, region_colors, num_regions, is_
     return original_color_regions
 
 
-def visualize_regions(pdf_path, output_dir):
+def visualize_regions(image, labels, num_regions, region_colors, is_black_list, pdf_path, output_dir):
     """
     可视化PDF文件中的区域
     
     Args:
+        image: pdf文件对应的图片
+        labels: 每个像素的region标签
+        num_regions: 一共多少个色块
+        region_colors: 每个色块的颜色信息
+        is_black_list: 是否是黑色背景区域
         pdf_path: PDF文件路径
         output_dir: 输出目录
         
     Returns:
         None
     """
-    # 读取图像（支持PDF和PNG）
-    image, (_, _, imgw, imgh) = pdf_to_image(pdf_path)
-    image_1k, (_, _, imgw, imgh) = pdf_to_image(pdf_path, image_size=config.ImgSizeForCluster)
-    
-    # 查找区域（不再区分边界和内部区域）
-    labels, region_colors, region_size, num_regions, is_black_list = find_regions(image, image_1k)
-    
-    # 获取每个区域的颜色
-    # region_colors1, region_size = get_region_info(image, labels, num_regions)
-    count_regions_below_threshold(region_size, [20, 30, 50])
-    
     # 统计非黑色区域的数量
     non_black_regions = sum(1 for i in range(1, num_regions + 1) if not is_black_list[i])
     
@@ -160,17 +154,7 @@ def visualize_regions(pdf_path, output_dir):
     plt.close()
     
     print(f"可视化结果已保存到: {output_path}")
-    
-    return {
-        "image": image,
-        "labels": labels,
-        "num_regions": num_regions,
-        "non_black_regions": non_black_regions,
-        "region_colors": region_colors,
-        "colored_regions": colored_regions,
-        "original_color_regions": original_color_regions,
-        "is_black_list": is_black_list
-    }
+
 
 def visualize_color_distribution(region_colors, output_dir, pdf_name, is_black_list=None):
     """
@@ -255,33 +239,3 @@ def visualize_color_distribution(region_colors, output_dir, pdf_name, is_black_l
     
     print(f"颜色分布图已保存到: {output_path}")
 
-def main():
-    # 处理data目录中的所有PDF文件
-    data_dir = "data\\pdf"
-    files = [f for f in os.listdir(data_dir) if f.endswith(".pdf")]
-    # files = ["1810.pdf"]
-    
-    # 创建输出目录
-    output_dir = "output"
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    
-    # 可视化每个PDF文件
-    for f in files:
-        print(f"\n 开始处理文件{f}")
-        file_path = os.path.join(data_dir, f)
-        file_name = f.split('.')[0]
-        
-        try:
-            # 可视化区域
-            vis_results = visualize_regions(file_path, output_dir)
-            
-            # 可视化颜色分布
-            visualize_color_distribution(vis_results["region_colors"], output_dir, file_name, vis_results["is_black_list"])
-            
-        except Exception as e:
-            print(f"处理文件 {f} 时出错: {str(e)}")
-
-
-if __name__ == "__main__":
-    main()
