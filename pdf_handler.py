@@ -5,6 +5,7 @@ import time
 import fitz  # PyMuPDF
 from PIL import Image
 from datetime import datetime
+from scipy.spatial.distance import cdist
 from collections import defaultdict, Counter
 from sklearn.cluster import KMeans
 import config
@@ -296,7 +297,9 @@ def find_regions(image_2k, image_1k):
     if np.any(border_regions_mask):
         final_labels[border_regions_mask] = next_label
         next_label += 1
-    
+
+    # 保存每个区域的大小和对应的颜色;下标0是背景信息;
+    region_size, region_color = [0], [(0,0,0)]
     # 只处理非边界区域
     if np.any(non_border_mask > 0):
         # 在缩小的图像上进行颜色聚类
@@ -327,6 +330,10 @@ def find_regions(image_2k, image_1k):
                     # 将当前连通区域添加到最终标签图像
                     mask = (color_labels == i)
                     final_labels[mask] = next_label
+
+                    # 当前连通区域信息:大小，颜色; next_label刚好就是下标值;
+                    region_size.append(area)
+                    region_color.append(tuple(cluster_bgr.tolist()))
                     
                     # 添加统计信息
                     stats_list.append(color_stats[i])
@@ -334,53 +341,50 @@ def find_regions(image_2k, image_1k):
                     is_black_list.append(is_black)
                     
                     next_label += 1
-    
-    # 转换统计信息和中心点列表为NumPy数组
-    stats_array = np.vstack(stats_list) if len(stats_list) > 1 else np.array([stats_list[0]])
-    centroids_array = np.vstack(centroids_list) if len(centroids_list) > 1 else np.array([centroids_list[0]])
+
     
     # 区域数量是next_label - 1（减去黑色）
     num_regions = next_label - 1
     
     print(f"区域识别完成，总用时: {time.time() - start_time:.2f}秒，识别到 {num_regions} 个区域")
-    
-    return final_labels, stats_array, centroids_array, num_regions, is_black_list
 
+    return final_labels, region_color, region_size, num_regions, is_black_list
 
-def get_region_info(image, labels, num_regions):
-    """
-    获取每个区域的主要颜色和数量
-    
-    Args:
-        image: 原始图像
-        labels: 标记的区域图像
-        num_regions: 区域数量
-        
-    Returns:
-        region_colors: 每个区域的主要颜色
-    """
-    region_colors = {}
-    region_size = []
-    
-    for i in range(1, num_regions + 1):  # 跳过背景（标签0）
-        # 创建当前区域的掩码
-        region_mask = (labels == i).astype(np.uint8)
-        
-        # 应用掩码到原始图像
-        masked_img = cv2.bitwise_and(image, image, mask=region_mask)
-        
-        # 获取非零像素（即区域内的像素）
-        non_zero_pixels = masked_img[region_mask > 0]
-        
-        if len(non_zero_pixels) > 0:
-            # 计算区域内像素的平均颜色
-            avg_color = np.mean(non_zero_pixels, axis=0).astype(int)
-            # 将颜色转换为元组以便作为字典键
-            color_tuple = tuple(avg_color)
-            region_colors[i] = color_tuple
-            region_size.append(len(non_zero_pixels))
-    
-    return region_colors, region_size
+#
+# def get_region_info(image, labels, num_regions):
+#     """
+#     获取每个区域的主要颜色和数量
+#
+#     Args:
+#         image: 原始图像
+#         labels: 标记的区域图像
+#         num_regions: 区域数量
+#
+#     Returns:
+#         region_colors: 每个区域的主要颜色
+#     """
+#     region_colors = {}
+#     region_size = []
+#
+#     for i in range(1, num_regions + 1):  # 跳过背景（标签0）
+#         # 创建当前区域的掩码
+#         region_mask = (labels == i).astype(np.uint8)
+#
+#         # 应用掩码到原始图像
+#         masked_img = cv2.bitwise_and(image, image, mask=region_mask)
+#
+#         # 获取非零像素（即区域内的像素）
+#         non_zero_pixels = masked_img[region_mask > 0]
+#
+#         if len(non_zero_pixels) > 0:
+#             # 计算区域内像素的平均颜色
+#             avg_color = np.mean(non_zero_pixels, axis=0).astype(int)
+#             # 将颜色转换为元组以便作为字典键
+#             color_tuple = tuple(avg_color)
+#             region_colors[i] = color_tuple
+#             region_size.append(len(non_zero_pixels))
+#
+#     return region_colors, region_size
 
 
 def analyze_pdf(pdf_path):
@@ -396,7 +400,7 @@ def analyze_pdf(pdf_path):
     """
     # 从PDF读取图像, 默认生成的事2k的图
     image, (_,_, imgw, imgh) = pdf_to_image(pdf_path)
-    image_1k, (_, _, imgw, imgh) = pdf_to_image(pdf_path, image_size=1024)
+    image_1k, (_, _, imgw, imgh) = pdf_to_image(pdf_path, image_size=config.ImgSizeForCluster)
     
     # 查找区域（先识别黑色边界，然后在非边界区域进行处理）
     labels, stats, centroids, num_regions, is_black_list = find_regions(image, image_1k)

@@ -2,8 +2,9 @@ import cv2
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import config
 from matplotlib.colors import ListedColormap
-from pdf_handler import pdf_to_image, find_regions, get_region_info, count_regions_below_threshold
+from pdf_handler import pdf_to_image, find_regions, count_regions_below_threshold
 
 
 def create_colored_regions_image(image, labels, num_regions, is_black_list=None):
@@ -64,7 +65,7 @@ def create_original_color_regions(image, labels, region_colors, num_regions, is_
         # 如果提供了黑色区域标记且当前区域是黑色，则使用深灰色表示
         if is_black_list is not None and is_black_list[i]:
             original_color_regions[labels == i] = [50, 50, 50]
-        elif i in region_colors:
+        else:
             original_color_regions[labels == i] = region_colors[i]
     
     return original_color_regions
@@ -83,13 +84,13 @@ def visualize_regions(pdf_path, output_dir):
     """
     # 读取图像（支持PDF和PNG）
     image, (_, _, imgw, imgh) = pdf_to_image(pdf_path)
-    image_1k, (_, _, imgw, imgh) = pdf_to_image(pdf_path, image_size=1024)
+    image_1k, (_, _, imgw, imgh) = pdf_to_image(pdf_path, image_size=config.ImgSizeForCluster)
     
     # 查找区域（不再区分边界和内部区域）
-    labels, stats, centroids, num_regions, is_black_list = find_regions(image, image_1k)
+    labels, region_colors, region_size, num_regions, is_black_list = find_regions(image, image_1k)
     
     # 获取每个区域的颜色
-    region_colors, region_size = get_region_info(image, labels, num_regions)
+    # region_colors1, region_size = get_region_info(image, labels, num_regions)
     count_regions_below_threshold(region_size, [20, 30, 50])
     
     # 统计非黑色区域的数量
@@ -187,7 +188,7 @@ def visualize_color_distribution(region_colors, output_dir, pdf_name, is_black_l
     # 统计每种颜色的区域数量（排除黑色区域）
     color_counts = {}
     
-    for region_id, color in region_colors.items():
+    for region_id, color in enumerate(region_colors):
         # 如果提供了黑色区域标记，则跳过黑色区域
         if is_black_list is not None and is_black_list[region_id]:
             continue
@@ -258,7 +259,7 @@ def main():
     # 处理data目录中的所有PDF文件
     data_dir = "data\\pdf"
     files = [f for f in os.listdir(data_dir) if f.endswith(".pdf")]
-    # files = ["1313.pdf"]
+    # files = ["1810.pdf"]
     
     # 创建输出目录
     output_dir = "output"
@@ -280,6 +281,7 @@ def main():
             
         except Exception as e:
             print(f"处理文件 {f} 时出错: {str(e)}")
+
 
 if __name__ == "__main__":
     main()
