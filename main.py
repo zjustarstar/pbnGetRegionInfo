@@ -22,14 +22,15 @@ def get_blockinfo_from_image(pdf_path):
 
 
 if __name__ == "__main__":
-    # 创建输出目录
-    output_dir = "output"
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    # 如果需要保存一些数据用于debug，需要创建输出目录
+    if config.SaveColorDistribution or config.SaveVisualResult:
+        output_dir = "output"
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
 
     start_time = time.time()
     # 处理data目录中的所有PDF文件
-    data_dir = "data\\0909_test2"
+    data_dir = "data"
     pdf_files = [f for f in os.listdir(data_dir) if f.endswith(".pdf")]
     
     for pdf_file in pdf_files:
@@ -38,6 +39,7 @@ if __name__ == "__main__":
         print(f"\n分析文件: {pdf_file}")
 
         try:
+            # 单个pdf文件的色块信息提取
             final_num_regions, min_colors, max_colors = get_blockinfo_from_image(pdf_path)
 
             # 输出返回结果
