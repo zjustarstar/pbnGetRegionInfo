@@ -5,6 +5,22 @@ import visualize_regions as visreg
 import config
 
 
+# 输入单张pdf图像，返回色块信息;
+def get_blockinfo_from_image(pdf_path):
+    image, _ = pdf_to_image(pdf_path)
+
+    # labels=全图每个像素的region标签; region_colors表示每个region的颜色;
+    labels, num_regions, region_colors, is_black_list, final_num_regions = analyze_pdf(image, pdf_path)
+    min_colors, max_colors = visreg.visualize_color_distribution(region_colors, output_dir, file_name, is_black_list)
+
+    # 可视化
+    if config.SaveVisualResult:
+        visreg.visualize_regions(image, labels, num_regions, region_colors, is_black_list, pdf_path, output_dir)
+
+    # 返回最终色块数, 最少的10种颜色BGR,最多的10种颜色BGR
+    return final_num_regions, min_colors, max_colors
+
+
 if __name__ == "__main__":
     # 创建输出目录
     output_dir = "output"
@@ -13,7 +29,7 @@ if __name__ == "__main__":
 
     start_time = time.time()
     # 处理data目录中的所有PDF文件
-    data_dir = "data\\pdf"
+    data_dir = "data\\0909_test2"
     pdf_files = [f for f in os.listdir(data_dir) if f.endswith(".pdf")]
     
     for pdf_file in pdf_files:
@@ -22,36 +38,17 @@ if __name__ == "__main__":
         print(f"\n分析文件: {pdf_file}")
 
         try:
-            image, _ = pdf_to_image(pdf_path)
+            final_num_regions, min_colors, max_colors = get_blockinfo_from_image(pdf_path)
 
-            # labels=全图每个像素的region标签; region_colors表示每个region的颜色;
-            labels, num_regions, region_colors, is_black_list = analyze_pdf(image, pdf_path)
+            # 输出返回结果
+            print(f"最终色块数量（不含黑色区域）: {final_num_regions}")
+            print("色块数量最少的10个颜色:")
+            for i, (color, count) in enumerate(min_colors):
+                print(f"  颜色 {i + 1}: BGR={color}, 区域数量={count}")
 
-            # 可视化
-            if config.SaveVisualResult:
-                visreg.visualize_regions(image, labels, num_regions, region_colors, is_black_list, pdf_path, output_dir)
-                visreg.visualize_color_distribution(region_colors, output_dir, file_name, is_black_list)
-
-            # 输出分析结果
-            #
-            # # 返回分析结果
-            # return {
-            #     "num_regions": non_black_count,  # 只计算非黑色区域
-            #     "num_colors": len(color_counts),
-            #     "max_region_area": max_region[1],
-            #     "min_region_area": min_region[1],
-            #     "max_color_regions": max_color_regions[1],
-            #     "min_color_regions": min_color_regions[1],
-            #     "labels": labels,  # 添加标签信息供可视化使用
-            #     "is_black_list": is_black_list,  # 添加黑色区域标记供可视化使用
-            #     "black_regions": black_regions,  # 添加黑色区域列表
-            #     "non_black_regions": non_black_regions  # 添加非黑色区域列表
-            # }
-
-            # print(f"闭合连通区域数量（不含黑色区域）: {results['num_regions']}")
-            # print(f"不同颜色数量: {results['num_colors']}")
-            # print(f"包含同一种颜色的最多区域数量: {results['max_color_regions']}")
-            # print(f"包含同一种颜色的最少区域数量: {results['min_color_regions']}")
+            print("色块数量最多的10个颜色:")
+            for i, (color, count) in enumerate(max_colors):
+                print(f"  颜色 {i + 1}: BGR={color}, 区域数量={count}")
             
         except Exception as e:
             print(f"处理文件 {pdf_file} 时出错: {str(e)}")

@@ -188,54 +188,58 @@ def visualize_color_distribution(region_colors, output_dir, pdf_name, is_black_l
     # 获取区域数量最少的10个和最多的10个颜色
     min_colors = sorted_colors[:min(10, len(sorted_colors)//2)]
     max_colors = sorted_colors[-min(10, len(sorted_colors)//2):]
-    
-    # 合并最少和最多的颜色
-    selected_colors = min_colors + max_colors
-    
-    # 创建颜色分布图
-    fig, ax = plt.subplots(figsize=(12, 6))
-    
-    # 准备数据
-    colors = [item[0] for item in selected_colors]
-    counts = [item[1] for item in selected_colors]
-    labels = [f"最少{i+1}" for i in range(len(min_colors))] + [f"最多{i+1}" for i in range(len(max_colors))]
-    
-    # 将BGR颜色转换为RGB用于显示
-    rgb_colors = [(c[2]/255, c[1]/255, c[0]/255) for c in colors]
-    
-    # 创建条形图
-    bars = ax.bar(range(len(colors)), counts, color=rgb_colors)
-    
-    # 添加数值标签
-    for bar, count in zip(bars, counts):
-        height = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
-                str(count), ha='center', va='bottom')
-    
-    # 设置标题和标签
-    ax.set_title(f'颜色分布 (显示区域数量最多和最少的各10个颜色，共 {len(color_counts)} 种非黑色颜色)')
-    ax.set_xlabel('颜色')
-    ax.set_ylabel('区域数量')
-    ax.set_xticks(range(len(colors)))
-    ax.set_xticklabels(labels)
-    
-    # 调整布局
-    plt.tight_layout()
-    
-    # 保存图像
-    output_path = os.path.join(output_dir, f"{pdf_name}_color_distribution.png")
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    plt.close()
-    
-    # 打印区域数量最多和最少的10个颜色
-    print(f"颜色分布 (共 {len(color_counts)} 种非黑色颜色)")
-    print("区域数量最少的10个颜色:")
-    for i, (color, count) in enumerate(min_colors):
-        print(f"  颜色 {i+1}: BGR={color}, 区域数量={count}")
-    
-    print("区域数量最多的10个颜色:")
-    for i, (color, count) in enumerate(max_colors):
-        print(f"  颜色 {i+1}: BGR={color}, 区域数量={count}")
-    
-    print(f"颜色分布图已保存到: {output_path}")
+
+    # 显示颜色分布;
+    if config.SaveColorDistribution:
+        # 合并最少和最多的颜色
+        selected_colors = min_colors + max_colors
+
+        # 创建颜色分布图
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        # 准备数据
+        colors = [item[0] for item in selected_colors]
+        counts = [item[1] for item in selected_colors]
+        labels = [f"最少{i+1}" for i in range(len(min_colors))] + [f"最多{i+1}" for i in range(len(max_colors))]
+
+        # 将BGR颜色转换为RGB用于显示
+        rgb_colors = [(c[2]/255, c[1]/255, c[0]/255) for c in colors]
+
+        # 创建条形图
+        bars = ax.bar(range(len(colors)), counts, color=rgb_colors)
+
+        # 添加数值标签
+        for bar, count in zip(bars, counts):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                    str(count), ha='center', va='bottom')
+
+        # 设置标题和标签
+        ax.set_title(f'颜色分布 (显示区域数量最多和最少的各10个颜色，共 {len(color_counts)} 种非黑色颜色)')
+        ax.set_xlabel('颜色')
+        ax.set_ylabel('区域数量')
+        ax.set_xticks(range(len(colors)))
+        ax.set_xticklabels(labels)
+
+        # 调整布局
+        plt.tight_layout()
+
+        # 保存图像
+        output_path = os.path.join(output_dir, f"{pdf_name}_color_distribution.png")
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+
+        # 打印区域数量最多和最少的10个颜色
+        print(f"颜色分布 (共 {len(color_counts)} 种非黑色颜色)")
+        print("区域数量最少的10个颜色:")
+        for i, (color, count) in enumerate(min_colors):
+            print(f"  颜色 {i+1}: BGR={color}, 区域数量={count}")
+
+        print("区域数量最多的10个颜色:")
+        for i, (color, count) in enumerate(max_colors):
+            print(f"  颜色 {i+1}: BGR={color}, 区域数量={count}")
+
+        print(f"颜色分布图已保存到: {output_path}")
+
+    return min_colors, max_colors
 

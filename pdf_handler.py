@@ -276,6 +276,9 @@ def find_regions(image_2k, image_1k):
     
     # 首先提取黑色边界
     borders, non_border_mask = extract_black_borders(image_2k)
+    # 缩小非黑色边界(相当于扩大黑色边界)
+    kernel = np.ones((3, 3), np.uint8)
+    non_border_mask = cv2.morphologyEx(non_border_mask, cv2.MORPH_ERODE, kernel)
     if config.SaveBorderImage:
         cv2.imwrite("output\\borders_2k.png", borders)
     
@@ -350,42 +353,6 @@ def find_regions(image_2k, image_1k):
 
     return final_labels, region_color, region_size, num_regions, is_black_list
 
-#
-# def get_region_info(image, labels, num_regions):
-#     """
-#     获取每个区域的主要颜色和数量
-#
-#     Args:
-#         image: 原始图像
-#         labels: 标记的区域图像
-#         num_regions: 区域数量
-#
-#     Returns:
-#         region_colors: 每个区域的主要颜色
-#     """
-#     region_colors = {}
-#     region_size = []
-#
-#     for i in range(1, num_regions + 1):  # 跳过背景（标签0）
-#         # 创建当前区域的掩码
-#         region_mask = (labels == i).astype(np.uint8)
-#
-#         # 应用掩码到原始图像
-#         masked_img = cv2.bitwise_and(image, image, mask=region_mask)
-#
-#         # 获取非零像素（即区域内的像素）
-#         non_zero_pixels = masked_img[region_mask > 0]
-#
-#         if len(non_zero_pixels) > 0:
-#             # 计算区域内像素的平均颜色
-#             avg_color = np.mean(non_zero_pixels, axis=0).astype(int)
-#             # 将颜色转换为元组以便作为字典键
-#             color_tuple = tuple(avg_color)
-#             region_colors[i] = color_tuple
-#             region_size.append(len(non_zero_pixels))
-#
-#     return region_colors, region_size
-
 
 def analyze_pdf(image, pdf_path):
     """
@@ -407,10 +374,16 @@ def analyze_pdf(image, pdf_path):
     #统计不同阈值下的色块数量
     count_results = count_regions_below_threshold(region_size, [20, 30, 50])
 
-    # # 统计非黑色区域的数量
-    # non_black_regions = sum(1 for i in range(1, num_regions + 1) if not is_black_list[i])
+    # 根据统计值，提供最合理的最终色块数量;默认是阈值50作为基准值
+    final_num_regions = count_results[50]
+    if count_results[20]>config.NumThre1 and count_results[30]>config.NumThre1 and count_results[50]>config.NumThre1:
+        final_num_regions = count_results[30]
 
-    return labels, num_regions, region_colors, is_black_list
+    # # 统计非黑色区域的数量
+    black_regions = sum(1 for i in range(1, num_regions + 1) if is_black_list[i])
+    print(f"black regions num:{black_regions}")
+
+    return labels, num_regions, region_colors, is_black_list, final_num_regions
 
 
 def extract_black_borders(image, threshold=config.BinaryThreshold):
@@ -433,7 +406,7 @@ def extract_black_borders(image, threshold=config.BinaryThreshold):
     
     # 使用形态学操作改善黑色区域的连通性
     # kernel = np.ones((3, 3), np.uint8)
-    # borders = cv2.morphologyEx(borders, cv2.MORPH_CLOSE, kernel)
+    # borders = cv2.morphologyEx(borders, cv2.MORPH_DILATE, kernel)
     
     # 创建非边界区域掩码（边界的反转）
     non_border_mask = cv2.bitwise_not(borders)
